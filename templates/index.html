@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macOS WireGuard Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .input-glass {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+        }
+        .input-glass:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-6">
+
+    <div class="glass w-full max-w-3xl rounded-2xl p-8 space-y-8 animate-fade-in">
+        <div class="flex justify-between items-center border-b border-gray-700 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">WireGuard Manager</h1>
+                <p class="text-gray-400 text-sm mt-1">macOS Control Plane</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="status-dot" class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                <span id="status-text" class="text-sm font-medium tracking-wide">Disconnected</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Client Config -->
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold text-blue-300">Client Configuration</h2>
+                
+                <div>
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Private Key</label>
+                    <input type="text" id="private_key" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="Client Private Key">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Public Key (Generated)</label>
+                    <input type="text" id="public_key" readonly class="input-glass w-full rounded-lg p-2.5 text-sm opacity-70 cursor-not-allowed" placeholder="Client Public Key">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Client Address</label>
+                    <input type="text" id="client_ip" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="10.0.0.2/32">
+                </div>
+
+                <button onclick="generateKeys()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors border border-gray-600 text-sm">
+                    Generate New Key Pair
+                </button>
+            </div>
+
+            <!-- Server Config -->
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold text-teal-300">Server Configuration</h2>
+                
+                <div>
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Server Public Key</label>
+                    <input type="text" id="server_pubkey" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="Server Public Key">
+                </div>
+                
+                <div>
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Server Endpoint</label>
+                    <input type="text" id="server_endpoint" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="server_ip:51820">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Allowed IPs</label>
+                    <input type="text" id="allowed_ips" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" value="0.0.0.0/0, ::/0">
+                </div>
+
+                <button onclick="saveConfig()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-lg transition-colors shadow-lg shadow-blue-500/20 text-sm">
+                    Save Configuration
+                </button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="border-t border-gray-700 pt-6 mt-6 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="kill_switch" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
+                </label>
+                <div>
+                    <span class="text-sm font-medium">Kill Switch (<code class="text-xs bg-gray-800 px-1 rounded">pfctl</code>)</span>
+                    <p class="text-xs text-gray-400">Block all traffic if VPN disconnects</p>
+                </div>
+            </div>
+
+            <button id="connect-btn" onclick="toggleConnection()" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-green-500/30 transform hover:scale-105 active:scale-95">
+                CONNECT
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let isConnected = false;
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                isConnected = data.connected;
+                updateUI();
+            } catch (e) {
+                console.error("Failed to fetch status");
+            }
+        }
+
+        function updateUI() {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            const btn = document.getElementById('connect-btn');
+            
+            if (isConnected) {
+                dot.classList.replace('bg-red-500', 'bg-green-500');
+                dot.classList.replace('shadow-[0_0_8px_rgba(239,68,68,0.8)]', 'shadow-[0_0_8px_rgba(34,197,94,0.8)]');
+                text.textContent = 'Connected';
+                
+                btn.textContent = 'DISCONNECT';
+                btn.className = "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-red-500/30 transform hover:scale-105 active:scale-95";
+            } else {
+                dot.classList.replace('bg-green-500', 'bg-red-500');
+                dot.classList.replace('shadow-[0_0_8px_rgba(34,197,94,0.8)]', 'shadow-[0_0_8px_rgba(239,68,68,0.8)]');
+                text.textContent = 'Disconnected';
+                
+                btn.textContent = 'CONNECT';
+                btn.className = "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-green-500/30 transform hover:scale-105 active:scale-95";
+            }
+        }
+
+        async function generateKeys() {
+            try {
+                const res = await fetch('/api/generate-keys', { method: 'POST' });
+                const data = await res.json();
+                if (data.private_key) {
+                    document.getElementById('private_key').value = data.private_key;
+                    document.getElementById('public_key').value = data.public_key;
+                } else {
+                    alert("Error generating keys: " + (data.error || "Unknown"));
+                }
+            } catch (e) {
+                alert("Request failed.");
+            }
+        }
+
+        async function saveConfig() {
+            const payload = {
+                private_key: document.getElementById('private_key').value,
+                client_ip: document.getElementById('client_ip').value,
+                server_pubkey: document.getElementById('server_pubkey').value,
+                server_endpoint: document.getElementById('server_endpoint').value,
+                allowed_ips: document.getElementById('allowed_ips').value
+            };
+            
+            try {
+                const res = await fetch('/api/save-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert("Configuration saved successfully!");
+                } else {
+                    alert("Failed to save: " + data.message);
+                }
+            } catch (e) {
+                alert("Request failed.");
+            }
+        }
+
+        async function toggleConnection() {
+            const btn = document.getElementById('connect-btn');
+            const killSwitch = document.getElementById('kill_switch').checked;
+            const serverEndpoint = document.getElementById('server_endpoint').value;
+            
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            try {
+                if (isConnected) {
+                    const res = await fetch('/api/disconnect', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status !== 'success') alert("Error: " + data.message);
+                } else {
+                    const res = await fetch('/api/connect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ kill_switch: killSwitch, server_endpoint: serverEndpoint })
+                    });
+                    const data = await res.json();
+                    if (data.status !== 'success') alert("Error: " + data.message);
+                }
+            } catch (e) {
+                alert("Connection request failed.");
+            }
+            
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            await fetchStatus();
+        }
+
+        // Initial check and polling
+        fetchStatus();
+        setInterval(fetchStatus, 3000);
+    </script>
+</body>
+</html>
