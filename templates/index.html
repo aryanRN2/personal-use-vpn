@@ -3,129 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>macOS WireGuard Client</title>
+    <title>VPN by Aryan | macOS Control Plane</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        
+        :root {
+            --accent-primary: #1a1a1a;
+            --accent-blue: #4285f4;
+            --bg-main: #ffffff;
+            --text-main: #000000;
+            --text-secondary: #5f6368;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
             min-height: 100vh;
+            overflow-x: hidden;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
         }
-        .input-glass {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #f8fafc;
+
+        .main-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            padding: 2rem;
+            animation: fadeIn 1s ease-out;
         }
-        .input-glass:focus {
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.08);
+        }
+
+        .input-antigravity {
+            background: #f8f9fa;
+            border: 1px solid #e8eaed;
+            color: #202124;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .input-antigravity:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+            border-color: var(--accent-blue);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.1);
+        }
+
+        .btn-black {
+            background: #000000;
+            color: #ffffff;
+            font-weight: 700;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-black:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            background: #1a1a1a;
+        }
+
+        .btn-outline {
+            background: #ffffff;
+            border: 1px solid #dadce0;
+            color: #3c4043;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline:hover {
+            background: #f8f9fa;
+            border-color: #bdc1c6;
+        }
+
+        .status-badge {
+            background: #f1f3f4;
+            border: 1px solid #e8eaed;
+            padding: 0.5rem 1rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-label {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #70757a;
+            margin-bottom: 0.75rem;
+            display: block;
         }
     </style>
 </head>
-<body class="flex items-center justify-center p-6">
+<body>
 
-    <div class="glass w-full max-w-3xl rounded-2xl p-8 space-y-8 animate-fade-in">
-        <div class="flex justify-between items-center border-b border-gray-700 pb-4">
-            <div>
-                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">WireGuard Manager</h1>
-                <p class="text-gray-400 text-sm mt-1">macOS Control Plane</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <div id="status-dot" class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
-                <span id="status-text" class="text-sm font-medium tracking-wide">Disconnected</span>
-            </div>
-        </div>
+    <canvas id="particle-canvas"></canvas>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Client Config -->
-            <div class="space-y-4">
-                <h2 class="text-lg font-semibold text-blue-300">Client Configuration</h2>
-                
-                <div>
-                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Private Key</label>
-                    <input type="text" id="private_key" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="Client Private Key">
+    <div class="main-container">
+        <div class="glass-card rounded-[2.5rem] p-10 md:p-14 space-y-12">
+            
+            <!-- Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2.5">
+                        <svg class="w-8 h-8 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
+                        </svg>
+                        <h1 class="text-3xl font-extrabold tracking-tight">Antigravity <span class="text-blue-600">VPN</span></h1>
+                    </div>
+                    <p class="text-slate-500 font-semibold text-lg ml-1">Next-gen agent platform for macOS</p>
                 </div>
                 
-                <div>
-                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Public Key (Generated)</label>
-                    <input type="text" id="public_key" readonly class="input-glass w-full rounded-lg p-2.5 text-sm opacity-70 cursor-not-allowed" placeholder="Client Public Key">
+                <div id="status-container" class="status-badge flex items-center">
+                    <div id="status-dot" class="w-2 h-2 rounded-full bg-red-500 mr-2.5"></div>
+                    <span id="status-text">Disconnected</span>
+                </div>
+            </div>
+
+            <!-- UI Body -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- Identity Section -->
+                <div class="space-y-8">
+                    <div>
+                        <span class="section-label">Identity Config</span>
+                        <div class="space-y-5">
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-400 ml-1 mb-1.5 block">PRIVATE KEY</label>
+                                <input type="password" id="private_key" class="input-antigravity w-full rounded-2xl p-4 text-sm" placeholder="••••••••••••••••••••••••••••">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-400 ml-1 mb-1.5 block">CLIENT ADDRESS</label>
+                                <input type="text" id="client_ip" class="input-antigravity w-full rounded-2xl p-4 text-sm" placeholder="10.0.0.2/32">
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="generateKeys()" class="btn-outline w-full py-4 rounded-2xl flex items-center justify-center gap-2">
+                        Generate New Identity
+                    </button>
                 </div>
 
-                <div>
-                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Client Address</label>
-                    <input type="text" id="client_ip" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="10.0.0.2/32">
+                <!-- Endpoint Section -->
+                <div class="space-y-8">
+                    <div>
+                        <span class="section-label">Remote Gateway</span>
+                        <div class="space-y-5">
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-400 ml-1 mb-1.5 block">SERVER PUBLIC KEY</label>
+                                <input type="text" id="server_pubkey" class="input-antigravity w-full rounded-2xl p-4 text-sm" placeholder="Paste public key...">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-400 ml-1 mb-1.5 block">ENDPOINT (IP:PORT)</label>
+                                <input type="text" id="server_endpoint" class="input-antigravity w-full rounded-2xl p-4 text-sm" placeholder="gateway.vpn:51820">
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="saveConfig()" class="btn-outline w-full py-4 rounded-2xl">
+                        Apply Configuration
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="pt-10 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div class="flex items-center gap-4">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="kill_switch" class="sr-only peer">
+                        <div class="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                    <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Enforce Kill Switch</span>
                 </div>
 
-                <button onclick="generateKeys()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors border border-gray-600 text-sm">
-                    Generate New Key Pair
+                <button id="connect-btn" onclick="toggleConnection()" class="btn-black w-full md:w-auto px-20 py-5 rounded-[1.25rem] text-lg shadow-xl shadow-slate-200">
+                    CONNECT
                 </button>
             </div>
-
-            <!-- Server Config -->
-            <div class="space-y-4">
-                <h2 class="text-lg font-semibold text-teal-300">Server Configuration</h2>
-                
-                <div>
-                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Server Public Key</label>
-                    <input type="text" id="server_pubkey" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="Server Public Key">
-                </div>
-                
-                <div>
-                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Server Endpoint</label>
-                    <input type="text" id="server_endpoint" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" placeholder="server_ip:51820">
-                </div>
-
-                <div>
-                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Allowed IPs</label>
-                    <input type="text" id="allowed_ips" class="input-glass w-full rounded-lg p-2.5 text-sm transition-all" value="0.0.0.0/0, ::/0">
-                </div>
-
-                <button onclick="saveConfig()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-lg transition-colors shadow-lg shadow-blue-500/20 text-sm">
-                    Save Configuration
-                </button>
-            </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="border-t border-gray-700 pt-6 mt-6 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="kill_switch" class="sr-only peer">
-                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
-                </label>
-                <div>
-                    <span class="text-sm font-medium">Kill Switch (<code class="text-xs bg-gray-800 px-1 rounded">pfctl</code>)</span>
-                    <p class="text-xs text-gray-400">Block all traffic if VPN disconnects</p>
-                </div>
-            </div>
-
-            <button id="connect-btn" onclick="toggleConnection()" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-green-500/30 transform hover:scale-105 active:scale-95">
-                CONNECT
-            </button>
         </div>
     </div>
 
     <script>
+        // Antigravity Particle System (Colorful Dots on White)
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        const colors = ['#4285f4', '#ea4335', '#fbbc05', '#34a853', '#8ab4f8', '#ff8d72'];
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initParticles();
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 1;
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.opacity = Math.random() * 0.5 + 0.2;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+            draw() {
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            const count = Math.floor((canvas.width * canvas.height) / 12000);
+            for (let i = 0; i < count; i++) particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', initCanvas);
+        initCanvas();
+        animate();
+
+        // VPN Controller
         let isConnected = false;
 
         async function fetchStatus() {
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
-                isConnected = data.connected;
-                updateUI();
-            } catch (e) {
-                console.error("Failed to fetch status");
-            }
+                if (isConnected !== data.connected) {
+                    isConnected = data.connected;
+                    updateUI();
+                }
+            } catch (e) {}
         }
 
         function updateUI() {
@@ -134,35 +288,22 @@
             const btn = document.getElementById('connect-btn');
             
             if (isConnected) {
-                dot.classList.replace('bg-red-500', 'bg-green-500');
-                dot.classList.replace('shadow-[0_0_8px_rgba(239,68,68,0.8)]', 'shadow-[0_0_8px_rgba(34,197,94,0.8)]');
-                text.textContent = 'Connected';
-                
+                dot.className = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]';
+                text.textContent = 'Active';
                 btn.textContent = 'DISCONNECT';
-                btn.className = "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-red-500/30 transform hover:scale-105 active:scale-95";
+                btn.className = "btn-black w-full md:w-auto px-20 py-5 rounded-[1.25rem] text-lg bg-red-600 shadow-xl shadow-red-100";
             } else {
-                dot.classList.replace('bg-green-500', 'bg-red-500');
-                dot.classList.replace('shadow-[0_0_8px_rgba(34,197,94,0.8)]', 'shadow-[0_0_8px_rgba(239,68,68,0.8)]');
+                dot.className = 'w-2 h-2 rounded-full bg-red-500';
                 text.textContent = 'Disconnected';
-                
                 btn.textContent = 'CONNECT';
-                btn.className = "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-green-500/30 transform hover:scale-105 active:scale-95";
+                btn.className = "btn-black w-full md:w-auto px-20 py-5 rounded-[1.25rem] text-lg shadow-xl shadow-slate-200";
             }
         }
 
         async function generateKeys() {
-            try {
-                const res = await fetch('/api/generate-keys', { method: 'POST' });
-                const data = await res.json();
-                if (data.private_key) {
-                    document.getElementById('private_key').value = data.private_key;
-                    document.getElementById('public_key').value = data.public_key;
-                } else {
-                    alert("Error generating keys: " + (data.error || "Unknown"));
-                }
-            } catch (e) {
-                alert("Request failed.");
-            }
+            const res = await fetch('/api/generate-keys', { method: 'POST' });
+            const data = await res.json();
+            if (data.private_key) document.getElementById('private_key').value = data.private_key;
         }
 
         async function saveConfig() {
@@ -171,24 +312,13 @@
                 client_ip: document.getElementById('client_ip').value,
                 server_pubkey: document.getElementById('server_pubkey').value,
                 server_endpoint: document.getElementById('server_endpoint').value,
-                allowed_ips: document.getElementById('allowed_ips').value
+                allowed_ips: "0.0.0.0/0"
             };
-            
-            try {
-                const res = await fetch('/api/save-config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    alert("Configuration saved successfully!");
-                } else {
-                    alert("Failed to save: " + data.message);
-                }
-            } catch (e) {
-                alert("Request failed.");
-            }
+            await fetch('/api/save-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
         }
 
         async function toggleConnection() {
@@ -197,32 +327,23 @@
             const serverEndpoint = document.getElementById('server_endpoint').value;
             
             btn.disabled = true;
-            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.style.opacity = '0.7';
             
             try {
-                if (isConnected) {
-                    const res = await fetch('/api/disconnect', { method: 'POST' });
-                    const data = await res.json();
-                    if (data.status !== 'success') alert("Error: " + data.message);
-                } else {
-                    const res = await fetch('/api/connect', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ kill_switch: killSwitch, server_endpoint: serverEndpoint })
-                    });
-                    const data = await res.json();
-                    if (data.status !== 'success') alert("Error: " + data.message);
-                }
-            } catch (e) {
-                alert("Connection request failed.");
-            }
+                const endpoint = isConnected ? '/api/disconnect' : '/api/connect';
+                const body = isConnected ? null : JSON.stringify({ kill_switch: killSwitch, server_endpoint: serverEndpoint });
+                await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                });
+            } catch (e) {}
             
             btn.disabled = false;
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.style.opacity = '1';
             await fetchStatus();
         }
 
-        // Initial check and polling
         fetchStatus();
         setInterval(fetchStatus, 3000);
     </script>
